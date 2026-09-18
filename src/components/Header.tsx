@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Search, Bell, User, ShoppingBag, ArrowRight, ShieldCheck, Truck, RefreshCw, X, Sparkles } from 'lucide-react';
+import { Menu, Search, Bell, User, ShoppingBag, ArrowRight, ShieldCheck, Truck, RefreshCw, X } from 'lucide-react';
 import { CurrencyCode, CategoryTab } from '../types';
 
 interface HeaderProps {

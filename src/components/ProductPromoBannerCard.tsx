@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, ArrowRight, ArrowLeft, Layers, ShoppingBag, Eye, ExternalLink } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Layers, ShoppingBag, Eye, ExternalLink } from 'lucide-react';
 import { ProductPromoBanner, CategoryTab } from '../types';
 
 interface ProductPromoBannerCardProps {
@@ -73,7 +73,7 @@ export const ProductPromoBannerCard: React.FC<ProductPromoBannerCardProps> = ({
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-2.5 h-2.5 mr-0.5 rtl:ml-0.5" />
+                  <Eye className="w-2.5 h-2.5 mr-0.5 rtl:ml-0.5" />
                   <span>{isArabic ? 'عرض خاص' : 'DISCOVER'}</span>
                 </>
               )}

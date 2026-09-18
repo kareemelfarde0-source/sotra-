@@ -6,7 +6,6 @@ import {
   Phone,
   Layout,
   Bell,
-  Sparkles,
   CheckCircle2,
   ExternalLink,
   ShieldCheck,
@@ -177,7 +176,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
             currentSection === 'promo' ? 'bg-black text-white shadow-xs' : 'text-neutral-700 hover:text-black'
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5" />
+          <Layout className="w-3.5 h-3.5" />
           <span>{isArabic ? 'النافذة المنبثقة الترويجية' : 'Promo Popup'}</span>
         </button>
       </div>
@@ -211,6 +210,69 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
                   : 'Requires customer to input payment reference and sender number for shipping before finishing checkout.'}
               </span>
             </label>
+          </div>
+
+          {/* Payment Methods Visibility Toggles (Show / Hide) */}
+          <div className="p-3.5 bg-neutral-50 rounded-lg border border-neutral-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-black text-xs text-neutral-900">
+                {isArabic ? 'إظهار وإخفاء طرق الدفع للعملاء في صفحة الدفع:' : 'Toggle Payment Methods Visibility in Checkout:'}
+              </span>
+              <span className="text-[10px] text-neutral-500 font-bold">
+                {isArabic ? 'حدد الطرق المتاحة فقط' : 'Select active methods'}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+              <label className="flex items-center space-x-2 rtl:space-x-reverse cursor-pointer bg-white p-2.5 rounded border border-neutral-200 hover:border-black transition">
+                <input
+                  type="checkbox"
+                  checked={wallet.enableVodafoneCash !== false}
+                  onChange={(e) => setWallet({ ...wallet, enableVodafoneCash: e.target.checked })}
+                  className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+                />
+                <span className="font-bold text-neutral-900">{isArabic ? 'فودافون كاش' : 'Vodafone Cash'}</span>
+              </label>
+
+              <label className="flex items-center space-x-2 rtl:space-x-reverse cursor-pointer bg-white p-2.5 rounded border border-neutral-200 hover:border-black transition">
+                <input
+                  type="checkbox"
+                  checked={wallet.enableInstapay !== false}
+                  onChange={(e) => setWallet({ ...wallet, enableInstapay: e.target.checked })}
+                  className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+                />
+                <span className="font-bold text-neutral-900">{isArabic ? 'انستا باي (InstaPay)' : 'InstaPay'}</span>
+              </label>
+
+              <label className="flex items-center space-x-2 rtl:space-x-reverse cursor-pointer bg-white p-2.5 rounded border border-neutral-200 hover:border-black transition">
+                <input
+                  type="checkbox"
+                  checked={wallet.enableCod !== false}
+                  onChange={(e) => setWallet({ ...wallet, enableCod: e.target.checked })}
+                  className="w-4 h-4 accent-black rounded cursor-pointer"
+                />
+                <span className="font-bold text-neutral-900">{isArabic ? 'الدفع عند الاستلام' : 'Cash on Delivery'}</span>
+              </label>
+
+              <label className="flex items-center space-x-2 rtl:space-x-reverse cursor-pointer bg-white p-2.5 rounded border border-neutral-200 hover:border-black transition">
+                <input
+                  type="checkbox"
+                  checked={wallet.enableOrangeCash === true}
+                  onChange={(e) => setWallet({ ...wallet, enableOrangeCash: e.target.checked })}
+                  className="w-4 h-4 accent-orange-600 rounded cursor-pointer"
+                />
+                <span className="font-bold text-neutral-900">{isArabic ? 'أورنج كاش' : 'Orange Cash'}</span>
+              </label>
+
+              <label className="flex items-center space-x-2 rtl:space-x-reverse cursor-pointer bg-white p-2.5 rounded border border-neutral-200 hover:border-black transition">
+                <input
+                  type="checkbox"
+                  checked={wallet.enableEtisalatCash === true}
+                  onChange={(e) => setWallet({ ...wallet, enableEtisalatCash: e.target.checked })}
+                  className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                />
+                <span className="font-bold text-neutral-900">{isArabic ? 'اتصالات كاش' : 'Etisalat Cash'}</span>
+              </label>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -659,7 +721,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
       {currentSection === 'promo' && (
         <form onSubmit={handleSavePromoPopup} className="p-4 sm:p-5 bg-white border border-neutral-200 rounded-lg space-y-4">
           <div className="flex items-center space-x-2 rtl:space-x-reverse border-b border-neutral-100 pb-3">
-            <Sparkles className="w-5 h-5 text-neutral-800" />
+            <Layout className="w-5 h-5 text-neutral-800" />
             <h4 className="font-bold text-sm text-neutral-900">
               {isArabic
                 ? 'النافذة المنبثقة الترويجية عند فتح الموقع (مربوطة بمنتج أو قسم)'
@@ -694,43 +756,39 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
               />
             </div>
 
+            {/* Size & Width Control */}
             <div>
               <label className="block font-bold text-neutral-700 mb-1">
-                {isArabic ? 'العنوان الرئيسي للنافذة (عربي) *' : 'Headline (Arabic) *'}
+                {isArabic ? 'مقاس النافذة المنبثقة (العرض) *' : 'Popup Size (Width) *'}
               </label>
-              <input
-                type="text"
-                required
-                value={promoPopup.titleAr}
-                onChange={(e) => setPromoPopup({ ...promoPopup, titleAr: e.target.value })}
+              <select
+                value={promoPopup.size || 'md'}
+                onChange={(e) => setPromoPopup({ ...promoPopup, size: e.target.value as any })}
                 className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded font-bold"
-              />
+              >
+                <option value="sm">{isArabic ? 'صغير (360px) - مناسب للهاتف' : 'Small (360px)'}</option>
+                <option value="md">{isArabic ? 'متوسط (480px) - قياسي متوازن' : 'Medium (480px)'}</option>
+                <option value="lg">{isArabic ? 'كبير (600px) - لافت وواضح' : 'Large (600px)'}</option>
+                <option value="xl">{isArabic ? 'شاشة عريضة (740px)' : 'Extra Large (740px)'}</option>
+                <option value="custom">{isArabic ? 'مقاس مخصص بالبكسل (Custom Width)' : 'Custom Width (px)'}</option>
+              </select>
             </div>
 
-            <div>
-              <label className="block font-bold text-neutral-700 mb-1">
-                {isArabic ? 'العنوان الفرعي / الوصف' : 'Subtitle / Description'}
-              </label>
-              <input
-                type="text"
-                value={promoPopup.subtitleAr || ''}
-                onChange={(e) => setPromoPopup({ ...promoPopup, subtitleAr: e.target.value })}
-                className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-neutral-700 mb-1">
-                {isArabic ? 'نص زر التوجيه' : 'CTA Button Text'}
-              </label>
-              <input
-                type="text"
-                value={promoPopup.buttonTextAr || ''}
-                onChange={(e) => setPromoPopup({ ...promoPopup, buttonTextAr: e.target.value })}
-                placeholder="تسوق الآن"
-                className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded font-bold"
-              />
-            </div>
+            {promoPopup.size === 'custom' && (
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">
+                  {isArabic ? 'العرض المخصص بالبكسل (px):' : 'Custom Width (px):'}
+                </label>
+                <input
+                  type="number"
+                  min="280"
+                  max="1200"
+                  value={promoPopup.customWidth || 500}
+                  onChange={(e) => setPromoPopup({ ...promoPopup, customWidth: Number(e.target.value) })}
+                  className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded font-mono font-bold"
+                />
+              </div>
+            )}
 
             {/* Target Type & Target Selector */}
             <div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Package,
@@ -14,9 +14,11 @@ import {
   Filter,
   DollarSign,
   UserCheck,
-  RefreshCw
+  RefreshCw,
+  Check
 } from 'lucide-react';
 import { CustomerOrder, OrderStatusType, Product } from '../../types';
+import { getAcknowledgedOrderIds, markOrdersAsAcknowledged, orderAlarm } from '../../utils/audioAlarm';
 
 interface AdminOrdersTabProps {
   orders: CustomerOrder[];
@@ -38,6 +40,37 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({
   const [archivePeriod, setArchivePeriod] = useState<
     'all' | 'today' | 'yesterday' | '7days' | 'month'
   >('all');
+  const [acknowledgedList, setAcknowledgedList] = useState<string[]>(() => getAcknowledgedOrderIds());
+
+  useEffect(() => {
+    const acks = getAcknowledgedOrderIds();
+    setAcknowledgedList(acks);
+
+    // If there are any unacknowledged active orders, start alarm sound
+    const hasUnacked = orders.some(
+      (o) => o.status !== 'delivered' && o.status !== 'cancelled' && !acks.includes(o.orderId)
+    );
+    if (hasUnacked) {
+      orderAlarm.start();
+    } else {
+      orderAlarm.stop();
+    }
+
+    return () => {
+      orderAlarm.stop();
+    };
+  }, [orders]);
+
+  const handleAcknowledgeOrder = (orderId: string) => {
+    markOrdersAsAcknowledged([orderId]);
+    setAcknowledgedList(getAcknowledgedOrderIds());
+  };
+
+  const handleAcknowledgeAll = () => {
+    const unacked = orders.map((o) => o.orderId);
+    markOrdersAsAcknowledged(unacked);
+    setAcknowledgedList(getAcknowledgedOrderIds());
+  };
 
   // Filter Active vs Delivered Orders
   const activeOrders = useMemo(() => {
@@ -112,6 +145,17 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({
     };
   }, [archivedOrders]);
 
+  // Order Counts by Status for Dropdown
+  const statusCounts = useMemo(() => {
+    return {
+      all: activeOrders.length,
+      received: activeOrders.filter((o) => o.status === 'received').length,
+      shipping_paid: activeOrders.filter((o) => o.status === 'shipping_paid').length,
+      courier: activeOrders.filter((o) => o.status === 'courier').length,
+      cancelled: activeOrders.filter((o) => o.status === 'cancelled').length
+    };
+  }, [activeOrders]);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'received':
@@ -158,8 +202,39 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({
     }
   };
 
+  const unacknowledgedOrders = useMemo(() => {
+    return orders.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled' && !acknowledgedList.includes(o.orderId));
+  }, [orders, acknowledgedList]);
+
   return (
     <div className="space-y-5">
+      {/* Repeating Audio Alert Banner */}
+      {unacknowledgedOrders.length > 0 && (
+        <div className="bg-red-600 text-white p-3.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md border border-red-700 animate-pulse">
+          <div className="flex items-center space-x-2.5 rtl:space-x-reverse font-bold text-xs">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <div>
+              <span className="block font-black text-sm">
+                {isArabic
+                  ? `🔔 طلبات جديدة بحاجة للمعاينة (${unacknowledgedOrders.length})`
+                  : `🔔 New Orders Pending Attention (${unacknowledgedOrders.length})`}
+              </span>
+              <span className="text-[11px] text-red-100 font-normal">
+                {isArabic
+                  ? 'يصدر صوت تنبيه مستمر لا يتوقف إلا بالضغط على "رأيته" أو "رأيت الكل".'
+                  : 'Continuous alert is active until acknowledged.'}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleAcknowledgeAll}
+            className="px-4 py-2 bg-white text-red-700 hover:bg-neutral-100 font-black text-xs rounded transition shadow cursor-pointer shrink-0"
+          >
+            {isArabic ? 'رأيت الكل (إيقاف الصوت)' : 'Mark All Seen (Stop Alarm)'}
+          </button>
+        </div>
+      )}
       {/* Top Header & Sub-tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200 pb-4">
         <div>
@@ -248,11 +323,21 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 bg-neutral-50 border border-neutral-300 rounded text-xs font-bold cursor-pointer"
           >
-            <option value="all">{isArabic ? 'جميع الحالات' : 'All Statuses'}</option>
-            <option value="received">{isArabic ? 'تم استلام الطلب' : 'Received'}</option>
-            <option value="shipping_paid">{isArabic ? 'تاكيد دفع الشحن' : 'Shipping Paid'}</option>
-            <option value="courier">{isArabic ? 'الطلب بشركة الشحن' : 'With Courier'}</option>
-            <option value="cancelled">{isArabic ? 'ملغي' : 'Cancelled'}</option>
+            <option value="all">
+              {isArabic ? `جميع الحالات (${statusCounts.all})` : `All Statuses (${statusCounts.all})`}
+            </option>
+            <option value="received">
+              {isArabic ? `تم استلام الطلب (${statusCounts.received})` : `Received (${statusCounts.received})`}
+            </option>
+            <option value="shipping_paid">
+              {isArabic ? `تأكيد دفع الشحن (${statusCounts.shipping_paid})` : `Shipping Paid (${statusCounts.shipping_paid})`}
+            </option>
+            <option value="courier">
+              {isArabic ? `الطلب بشركة الشحن (${statusCounts.courier})` : `With Courier (${statusCounts.courier})`}
+            </option>
+            <option value="cancelled">
+              {isArabic ? `ملغي (${statusCounts.cancelled})` : `Cancelled (${statusCounts.cancelled})`}
+            </option>
           </select>
         ) : (
           /* Period filter in Archive subTab */
@@ -313,7 +398,18 @@ export const AdminOrdersTab: React.FC<AdminOrdersTabProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center space-x-3 rtl:space-x-reverse">
+                  <div className="flex items-center space-x-2.5 rtl:space-x-reverse">
+                    {!acknowledgedList.includes(order.orderId) && (
+                      <button
+                        type="button"
+                        onClick={() => handleAcknowledgeOrder(order.orderId)}
+                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded shadow transition flex items-center space-x-1 rtl:space-x-reverse cursor-pointer animate-pulse"
+                        title={isArabic ? 'إيقاف التنبيه الصوتي وتأكيد الرؤية' : 'Acknowledge order and stop alert'}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>{isArabic ? 'رأيته' : 'Seen'}</span>
+                      </button>
+                    )}
                     {getStatusBadge(order.status)}
                     <span className="font-black text-sm text-neutral-950 font-heading">
                       {order.total} ج.م

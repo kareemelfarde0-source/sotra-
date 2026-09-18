@@ -37,7 +37,7 @@ export const FloatingWhatsApp: React.FC<FloatingWhatsAppProps> = ({ isArabic }) 
   return (
     <aside
       aria-label="Customer Support Floating Action"
-      className="fixed bottom-5 right-5 z-40 flex flex-col items-end"
+      className="fixed bottom-20 sm:bottom-6 right-3.5 sm:right-6 z-40 flex flex-col items-end"
     >
       {/* Floating Interactive Form Modal */}
       {isOpen && (

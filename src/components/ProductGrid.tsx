@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SlidersHorizontal, LayoutGrid, Grid2X2, Square, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { SlidersHorizontal, LayoutGrid, Grid2X2, Square, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { Product, CategoryTab, CurrencyCode } from '../types';
 import { ProductCard } from './ProductCard';
 
@@ -87,9 +87,9 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
           <button
             type="button"
             onClick={handleGoToBundles}
-            className="self-start sm:self-auto inline-flex items-center space-x-1.5 rtl:space-x-reverse px-3 py-1.5 bg-neutral-100 hover:bg-black hover:text-white text-neutral-900 rounded text-xs font-black uppercase tracking-wider transition cursor-pointer border border-neutral-300 shadow-xs"
+            className="self-start sm:self-auto inline-flex items-center space-x-1.5 rtl:space-x-reverse px-3 py-1.5 bg-neutral-100 hover:bg-black hover:text-white text-neutral-900 rounded-md text-xs font-black uppercase tracking-wider transition cursor-pointer border border-neutral-300 shadow-xs"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <Layers className="w-3.5 h-3.5 text-neutral-700 hover:text-white" />
             <span>{isArabic ? 'قسم الأطقم والتنسيقات الخاصة' : 'Outfit Sets & Bundles Section'}</span>
           </button>
         </div>

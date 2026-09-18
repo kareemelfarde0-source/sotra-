@@ -1,7 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PRODUCTS, CURRENCY_RATES, CATEGORIES_DATA } from './data/products';
-import { OUTFIT_BUNDLES } from './data/bundles';
-import { Product, CartItem, CategoryTab, CurrencyCode, FilterOptions, OutfitBundle, CustomerProfile, CustomerOrder, StoreCategory, OrderStatusType, BroadcastNotification, SitePromoPopup } from './types';
+import { CURRENCY_RATES } from './data/products';
+import {
+  Product,
+  CartItem,
+  CategoryTab,
+  CurrencyCode,
+  FilterOptions,
+  OutfitBundle,
+  CustomerProfile,
+  CustomerOrder,
+  StoreCategory,
+  OrderStatusType,
+  BroadcastNotification,
+  SitePromoPopup
+} from './types';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { HomeStoreView } from './components/HomeStoreView';
@@ -28,6 +40,20 @@ import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { BroadcastBanner } from './components/BroadcastBanner';
 import { PromoPopupModal } from './components/PromoPopupModal';
 import { getBroadcastNotification, getPromoPopupSettings } from './utils/storeSettings';
+import {
+  subscribeToProducts,
+  subscribeToCategories,
+  subscribeToBundles,
+  subscribeToOrders,
+  saveProductsBatchToFirestore,
+  saveCategoriesBatchToFirestore,
+  saveBundlesBatchToFirestore,
+  createOrderInFirestore,
+  updateOrderInFirestore,
+  deleteOrderFromFirestore,
+  saveProductToFirestore
+} from './firebase/db';
+import { initializeFirestoreDataIfNeeded } from './firebase/seed';
 
 export default function App() {
   // Locale and Currency State - Primary default is Arabic
@@ -35,14 +61,14 @@ export default function App() {
     try {
       const saved = localStorage.getItem('sotra_lang');
       if (saved) return saved === 'ar';
-      return true; // Primary default is Arabic
+      return true;
     } catch {
       return true;
     }
   });
   const [currency, setCurrency] = useState<CurrencyCode>('EGP');
 
-  // Customer Profile & Address Book (Persisted in localStorage)
+  // Customer Profile & Address Book
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile>(() => {
     try {
       const saved = localStorage.getItem('sotra_customer_profile');
@@ -66,7 +92,7 @@ export default function App() {
     }
   });
 
-  // Customer Orders Record (Persisted in localStorage)
+  // Customer Orders Record - Real-time Firestore synchronized
   const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>(() => {
     try {
       const saved = localStorage.getItem('sotra_customer_orders');
@@ -94,7 +120,7 @@ export default function App() {
     onlyInStock: false
   });
 
-  // Cart State (Persisted in localStorage)
+  // Cart State (Persisted in localStorage for visitor session)
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem('sotra_cart');
@@ -129,7 +155,7 @@ export default function App() {
   // Quick Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Dynamic Products, Categories, and Bundles (Admin Managed & Persisted)
+  // Dynamic Products, Categories, and Bundles - Firestore Real-time synchronized
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('sotra_products_data');
@@ -137,7 +163,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-    return PRODUCTS;
+    return [];
   });
 
   const [categories, setCategories] = useState<StoreCategory[]>(() => {
@@ -147,10 +173,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-    return CATEGORIES_DATA.map((c) => ({
-      ...c,
-      showInShopByCategory: c.id !== 'all' && c.id !== 'sets'
-    }));
+    return [];
   });
 
   const [bundles, setBundles] = useState<OutfitBundle[]>(() => {
@@ -160,12 +183,75 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-    return OUTFIT_BUNDLES;
+    return [];
   });
 
   // Admin Modals
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
   const [isAdminDashboardOpen, setIsAdminDashboardOpen] = useState(false);
+
+  // 1. Initial Firestore Bootstrap & Real-time Listeners
+  useEffect(() => {
+    // Check and seed initial data if Firestore is currently empty
+    initializeFirestoreDataIfNeeded().catch(console.error);
+
+    // Subscribe to real-time Products
+    const unsubProducts = subscribeToProducts((firestoreProducts) => {
+      if (firestoreProducts.length > 0) {
+        setProducts(firestoreProducts);
+        try {
+          localStorage.setItem('sotra_products_data', JSON.stringify(firestoreProducts));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    });
+
+    // Subscribe to real-time Categories
+    const unsubCategories = subscribeToCategories((firestoreCategories) => {
+      if (firestoreCategories.length > 0) {
+        const mapped = firestoreCategories.map((c) => ({
+          ...c,
+          showInShopByCategory: c.id !== 'all' && c.id !== 'sets'
+        }));
+        setCategories(mapped);
+        try {
+          localStorage.setItem('sotra_categories_data', JSON.stringify(mapped));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    });
+
+    // Subscribe to real-time Bundles
+    const unsubBundles = subscribeToBundles((firestoreBundles) => {
+      if (firestoreBundles.length > 0) {
+        setBundles(firestoreBundles);
+        try {
+          localStorage.setItem('sotra_bundles_data', JSON.stringify(firestoreBundles));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    });
+
+    // Subscribe to real-time Orders
+    const unsubOrders = subscribeToOrders((firestoreOrders) => {
+      setCustomerOrders(firestoreOrders);
+      try {
+        localStorage.setItem('sotra_customer_orders', JSON.stringify(firestoreOrders));
+      } catch (e) {
+        console.error(e);
+      }
+    });
+
+    return () => {
+      unsubProducts();
+      unsubCategories();
+      unsubBundles();
+      unsubOrders();
+    };
+  }, []);
 
   const handleSaveProducts = (updatedProducts: Product[]) => {
     setProducts(updatedProducts);
@@ -174,6 +260,8 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
+    // Sync to Firestore in real-time
+    saveProductsBatchToFirestore(updatedProducts).catch(console.error);
   };
 
   const handleSaveCategories = (updatedCategories: StoreCategory[]) => {
@@ -183,6 +271,8 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
+    // Sync to Firestore in real-time
+    saveCategoriesBatchToFirestore(updatedCategories).catch(console.error);
   };
 
   const handleSaveBundles = (updatedBundles: OutfitBundle[]) => {
@@ -192,6 +282,8 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
+    // Sync to Firestore in real-time
+    saveBundlesBatchToFirestore(updatedBundles).catch(console.error);
   };
 
   const handleResetDefaults = () => {
@@ -202,16 +294,10 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-    setProducts(PRODUCTS);
-    setCategories(
-      CATEGORIES_DATA.map((c) => ({
-        ...c,
-        showInShopByCategory: c.id !== 'all' && c.id !== 'sets'
-      }))
-    );
-    setBundles(OUTFIT_BUNDLES);
-    setToastMessage(isArabic ? 'تمت استعادة البيانات الافتراضية بنجاح' : 'Default data restored');
-    setTimeout(() => setToastMessage(null), 3000);
+    initializeFirestoreDataIfNeeded().then(() => {
+      setToastMessage(isArabic ? 'تمت استعادة البيانات الافتراضية بنجاح' : 'Default data restored');
+      setTimeout(() => setToastMessage(null), 3000);
+    });
   };
 
   const handleAdminLogout = () => {
@@ -303,7 +389,7 @@ export default function App() {
 
   const handleAddCustomerOrder = (order: CustomerOrder) => {
     setCustomerOrders((prev) => {
-      const updated = [order, ...prev];
+      const updated = [order, ...prev.filter((o) => o.orderId !== order.orderId)];
       try {
         localStorage.setItem('sotra_customer_orders', JSON.stringify(updated));
       } catch (e) {
@@ -311,10 +397,11 @@ export default function App() {
       }
       return updated;
     });
+    // Direct sync to Firestore
+    createOrderInFirestore(order).catch(console.error);
   };
 
   // Inventory lifecycle & order status handler:
-  // "الغاء الطلب يرجع المخزون و اذا تم دفع الشحن ينقص من المخزون"
   const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatusType) => {
     let updatedProducts = [...products];
 
@@ -426,6 +513,15 @@ export default function App() {
         console.error('Failed to save updated orders', e);
       }
 
+      // Sync updated order status to Firestore
+      updateOrderInFirestore(order.orderId, {
+        status: order.status,
+        statusAr: order.statusAr,
+        stockDeducted: order.stockDeducted,
+        deliveredAt: order.deliveredAt,
+        cancelledAt: order.cancelledAt
+      }).catch(console.error);
+
       return nextOrders;
     });
 
@@ -435,6 +531,8 @@ export default function App() {
     } catch (e) {
       console.error('Failed to save updated products', e);
     }
+    // Sync affected products back to Firestore
+    saveProductsBatchToFirestore(updatedProducts).catch(console.error);
   };
 
   // Switch to a Dedicated Category Page
@@ -450,68 +548,66 @@ export default function App() {
     }
   };
 
-  // Filter and Sort Products Logic
-  const currentCategoryToFilter = activeCategoryView || selectedCategory;
+  // Back to Main Home Page
+  const handleBackToHome = () => {
+    setActiveCategoryView(null);
+    setSelectedCategory('all');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
+  // Filter products by search and category
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      // Category Filter
-      if (currentCategoryToFilter !== 'all' && currentCategoryToFilter !== 'sets') {
-        if (currentCategoryToFilter === 'compressions') {
-          if (product.category !== 'compressions' && !product.name.toLowerCase().includes('compression')) {
-            return false;
-          }
-        } else if (currentCategoryToFilter === 'tops') {
-          if (product.category !== 'tops' && product.category !== 'compressions') {
-            return false;
-          }
-        } else if (currentCategoryToFilter === 'tanks') {
-          if (product.category !== 'tanks') return false;
-        } else if (currentCategoryToFilter === 'bottoms') {
-          if (product.category !== 'bottoms') return false;
-        } else if (currentCategoryToFilter === 'accessories') {
-          if (product.category !== 'accessories') return false;
-        }
+      // Category filter
+      if (filters.category !== 'all' && product.category !== filters.category) {
+        return false;
       }
-
-      // Sizes Filter
+      // Fit filter
+      if (filters.fit.length > 0 && !filters.fit.includes(product.fit)) {
+        return false;
+      }
+      // Sizes filter
       if (filters.sizes.length > 0) {
         const hasSize = product.sizes.some(
           (s) => filters.sizes.includes(s.size) && s.inStock
         );
         if (!hasSize) return false;
       }
-
-      // Colors Filter
+      // Colors filter
       if (filters.colors.length > 0) {
         const hasColor = product.colors.some((c) =>
-          filters.colors.some(
-            (fc) => c.name.toLowerCase().includes(fc.toLowerCase())
-          )
+          filters.colors.includes(c.name)
         );
         if (!hasColor) return false;
       }
-
-      // Discount Filter
-      if (filters.onlyDiscounted && (!product.discountPercent || product.discountPercent <= 0)) {
+      // Price range
+      if (
+        product.discountedPrice < filters.minPrice ||
+        product.discountedPrice > filters.maxPrice
+      ) {
         return false;
       }
-
-      // Stock Filter
-      if (filters.onlyInStock) {
-        const anyInStock = product.sizes.some((s) => s.inStock);
-        if (!anyInStock) return false;
+      // Only discounted
+      if (filters.onlyDiscounted && !product.discountedPrice) {
+        return false;
       }
-
-      // Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesName = product.name.toLowerCase().includes(q) || (product.nameAr && product.nameAr.includes(q));
-        const matchesDesc = product.description.toLowerCase().includes(q) || (product.descriptionAr && product.descriptionAr.includes(q));
-        const matchesCategory = product.category.toLowerCase().includes(q);
-        if (!matchesName && !matchesDesc && !matchesCategory) return false;
+      // Only in stock
+      if (filters.onlyInStock && !product.inStock) {
+        return false;
       }
-
+      // Search query (from both navbar and filter drawer)
+      const q = (searchQuery || filters.searchQuery || '').trim().toLowerCase();
+      if (q) {
+        const matchName = product.name.toLowerCase().includes(q);
+        const matchNameAr = product.nameAr ? product.nameAr.includes(q) : false;
+        const matchDesc = product.description.toLowerCase().includes(q);
+        const matchColor = product.colors.some((c) =>
+          c.name.toLowerCase().includes(q)
+        );
+        if (!matchName && !matchNameAr && !matchDesc && !matchColor) {
+          return false;
+        }
+      }
       return true;
     }).sort((a, b) => {
       if (filters.sortBy === 'price-low') {
@@ -521,13 +617,19 @@ export default function App() {
         return b.discountedPrice - a.discountedPrice;
       }
       if (filters.sortBy === 'discount') {
-        return (b.discountPercent || 0) - (a.discountPercent || 0);
+        const discA = a.originalPrice - a.discountedPrice;
+        const discB = b.originalPrice - b.discountedPrice;
+        return discB - discA;
       }
+      if (filters.sortBy === 'newest') {
+        return (b.isNewArrival ? 1 : 0) - (a.isNewArrival ? 1 : 0);
+      }
+      // featured / default: respect displayOrder
       return (a.displayOrder ?? 999) - (b.displayOrder ?? 999);
     });
-  }, [products, currentCategoryToFilter, filters, searchQuery]);
+  }, [products, filters, searchQuery]);
 
-  // Cart Management
+  // Add Item to Cart
   const handleAddToCart = (
     product: Product,
     colorName: string,
@@ -537,6 +639,7 @@ export default function App() {
     image: string
   ) => {
     const cartId = `${product.id}-${colorName}-${size}`;
+
     setCartItems((prev) => {
       const existing = prev.find((item) => item.cartId === cartId);
       if (existing) {
@@ -634,39 +737,41 @@ export default function App() {
     );
   };
 
-  const handleUpdateQuantity = (cartId: string, delta: number) => {
-    setCartItems((prev) =>
-      prev
-        .map((item) => {
-          if (item.cartId === cartId) {
-            const nextQty = item.quantity + delta;
-            return nextQty > 0 ? { ...item, quantity: nextQty } : null;
-          }
-          return item;
-        })
-        .filter(Boolean) as CartItem[]
-    );
+  const handleUpdateQuantity = (cartId: string, quantity: number) => {
+    if (quantity <= 0) {
+      setCartItems((prev) => prev.filter((item) => item.cartId !== cartId));
+    } else {
+      setCartItems((prev) =>
+        prev.map((item) =>
+          item.cartId === cartId ? { ...item, quantity } : item
+        )
+      );
+    }
   };
 
-  const handleRemoveFromCart = (cartId: string) => {
+  const handleRemoveItem = (cartId: string) => {
     setCartItems((prev) => prev.filter((item) => item.cartId !== cartId));
+  };
+
+  const handleClearCart = () => {
+    setCartItems([]);
+    setPromoCode('');
+    setDiscountAmount(0);
   };
 
   const handleApplyPromo = (code: string) => {
     const clean = code.trim().toUpperCase();
-    const subtotal = cartItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
-
     if (clean === 'SOTRA10') {
-      const discount = subtotal * 0.1;
+      const discount = Math.round(subtotal * 0.1);
       setPromoCode('SOTRA10');
       setDiscountAmount(discount);
       return { success: true, message: 'Code SOTRA10 applied! 10% discount added.' };
     }
-    if (clean === 'EGYPT50') {
-      const discount = Math.min(subtotal, 50);
-      setPromoCode('EGYPT50');
+    if (clean === 'SOTRA15') {
+      const discount = Math.round(subtotal * 0.15);
+      setPromoCode('SOTRA15');
       setDiscountAmount(discount);
-      return { success: true, message: 'Code EGYPT50 applied! LE 50 discount added.' };
+      return { success: true, message: 'Code SOTRA15 applied! 15% discount added.' };
     }
     if (clean === 'WELCOME') {
       const discount = Math.min(subtotal, 100);
@@ -703,14 +808,14 @@ export default function App() {
   const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
   const handleOpenBundleById = (bundleId: string) => {
-    const foundBundle = OUTFIT_BUNDLES.find((b) => b.id === bundleId);
+    const foundBundle = bundles.find((b) => b.id === bundleId);
     if (foundBundle) {
       setActiveBundle(foundBundle);
     }
   };
 
   const handleSelectProductById = (productId: string) => {
-    const prod = productsMap[productId] || PRODUCTS.find((p) => p.id === productId);
+    const prod = productsMap[productId] || products.find((p) => p.id === productId);
     if (prod) {
       setActiveProduct(prod);
       setActiveColorId(undefined);
@@ -771,172 +876,208 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen bg-white text-neutral-950 font-sans flex flex-col pb-16 md:pb-0 ${isArabic ? 'font-arabic' : ''}`}>
-      {/* Toast Notification */}
+    <div className="min-h-screen bg-white text-neutral-900 flex flex-col font-sans selection:bg-black selection:text-white">
+      {/* Toast Feedback */}
       {toastMessage && (
-        <div className="fixed top-20 right-4 z-50 bg-black text-white px-4 py-2.5 shadow-2xl text-xs font-bold uppercase tracking-wider flex items-center space-x-2 animate-in fade-in slide-in-from-top-4">
-          <span className="w-2 h-2 rounded-full bg-green-400" />
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-neutral-950 text-white text-xs font-semibold px-4 py-2.5 rounded shadow-xl tracking-wide flex items-center space-x-2 rtl:space-x-reverse animate-in fade-in slide-in-from-bottom-3 duration-200">
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Site-wide Broadcast / Urgent Notification Banner */}
+      {/* Broadcast Announcement Bar */}
       <BroadcastBanner notification={notificationSettings} isArabic={isArabic} />
 
-      {/* Main Header & Announcement Bar with Direct Tabs */}
+      {/* Primary Sticky Header */}
       <Header
         cartCount={totalCartCount}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenFilter={() => setIsFilterOpen(true)}
         onOpenNotifications={() => setIsNotificationsOpen(true)}
+        onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
-        onOpenMenu={() => setIsMobileMenuOpen(true)}
+        onOpenOrderTracking={() => setIsOrderTrackingOpen(true)}
         currency={currency}
         onChangeCurrency={setCurrency}
         isArabic={isArabic}
         onToggleLanguage={() => setIsArabic(!isArabic)}
-        onGoHome={() => {
-          setActiveCategoryView(null);
-          setSelectedCategory('all');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
         activeNavTab={activeNavTab}
         onNavigateTab={handleNavigateTab}
       />
 
-      <main className="flex-1">
-        {/* CONDITIONAL ROUTE: If user is on a dedicated Category or Sets page */}
-        {activeCategoryView === 'sets' ? (
+      {/* Main Content: Either Dedicated Category View OR Complete Home Store View */}
+      {activeCategoryView === 'sets' ? (
+        <main className="flex-1">
+          <div className="bg-neutral-950 text-white py-8 px-4 border-b border-neutral-800">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <div>
+                <button
+                  type="button"
+                  onClick={handleBackToHome}
+                  className="text-xs text-neutral-400 hover:text-white mb-2 flex items-center space-x-1.5 rtl:space-x-reverse transition cursor-pointer"
+                >
+                  <span>{isArabic ? '← العودة للرئيسية' : '← Back to Home'}</span>
+                </button>
+                <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight">
+                  {isArabic ? 'تنسيقات وأطقم سوترة الكاملة' : 'Complete Outfit Sets & Bundles'}
+                </h1>
+                <p className="text-xs text-neutral-400 mt-1">
+                  {isArabic
+                    ? 'وفر حتى 300 ج.م عند شراء الأطقم المتناسقة كقطعة واحدة مع إمكانية تحديد مقاس ولون كل قطعة'
+                    : 'Save up to 300 LE with coordinated sets while customizing size and color for each item'}
+                </p>
+              </div>
+            </div>
+          </div>
           <BundlesSection
-            bundles={OUTFIT_BUNDLES}
-            productsMap={productsMap}
-            currency={currency}
-            currencyRate={CURRENCY_RATES[currency]}
-            onOpenBundleModal={(b) => setActiveBundle(b)}
-            isArabic={isArabic}
-            isStandalonePage={true}
-            onBackToShop={() => {
-              setActiveCategoryView(null);
-              setSelectedCategory('all');
-            }}
-            onChangeCategory={(cat) => handleOpenCategory(cat)}
-          />
-        ) : activeCategoryView ? (
-          <CategoryPage
-            category={activeCategoryView}
-            products={filteredProducts}
-            currency={currency}
-            currencyRate={CURRENCY_RATES[currency]}
-            onSelectProduct={(product, colorId) => {
-              setActiveProduct(product);
-              setActiveColorId(colorId);
-            }}
-            onQuickAdd={handleQuickAdd}
-            onOpenFilterDrawer={() => setIsFilterOpen(true)}
-            activeFilterCount={activeFilterCount}
-            onOpenBundleModal={handleOpenBundleById}
-            onSelectProductById={handleSelectProductById}
-            onBackToShop={() => {
-              setActiveCategoryView(null);
-              setSelectedCategory('all');
-            }}
-            onChangeCategory={(cat) => handleOpenCategory(cat)}
-            isArabic={isArabic}
-          />
-        ) : (
-          /* PRIMARY HOME STORE VIEW: Merged Experience with Hero, Categories, New Arrivals, Best Sellers, Style 2x2, Full Catalog Grid, and Outfit Sets */
-          <HomeStoreView
-            products={products}
-            filteredProducts={filteredProducts}
-            selectedCategory={selectedCategory}
-            onSelectCategory={(cat) => {
-              if (cat === 'sets') {
-                handleOpenCategory('sets');
-              } else {
-                setSelectedCategory(cat);
-              }
-            }}
             bundles={bundles}
             productsMap={productsMap}
+            onSelectBundle={(bundle) => setActiveBundle(bundle)}
             currency={currency}
             currencyRate={CURRENCY_RATES[currency]}
-            onSelectProduct={(product, colorId) => {
-              setActiveProduct(product);
-              setActiveColorId(colorId);
-            }}
-            onQuickAdd={handleQuickAdd}
-            onOpenBundleModal={(bundle) => setActiveBundle(bundle)}
-            onOpenFilterDrawer={() => setIsFilterOpen(true)}
-            activeFilterCount={activeFilterCount}
-            onOpenCategory={(cat) => handleOpenCategory(cat)}
-            onShopAll={() => {
-              setSelectedCategory('all');
+            isArabic={isArabic}
+          />
+        </main>
+      ) : activeCategoryView !== null ? (
+        <CategoryPage
+          categoryKey={activeCategoryView}
+          products={products}
+          onBack={handleBackToHome}
+          onSelectProduct={(p, colorId) => {
+            setActiveProduct(p);
+            setActiveColorId(colorId);
+          }}
+          onQuickAdd={handleQuickAdd}
+          currency={currency}
+          currencyRate={CURRENCY_RATES[currency]}
+          isArabic={isArabic}
+          categories={categories}
+        />
+      ) : (
+        <main className="flex-1">
+          {/* Hero Section */}
+          <Hero
+            isArabic={isArabic}
+            onShopNow={() => {
               const el = document.getElementById('all-products-catalog');
               if (el) el.scrollIntoView({ behavior: 'smooth' });
             }}
-            onNewArrivals={() => {
-              const el = document.getElementById('new-arrivals-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            onExploreSets={() => {
+              handleOpenCategory('sets');
             }}
-            categories={categories}
-            shopByCategoryTiles={shopByCategoryTiles}
+          />
+
+          {/* Shop By Category Tiles Carousel */}
+          <div id="categories-section">
+            <CategoryCarousel
+              categories={shopByCategoryTiles}
+              selectedCategory={selectedCategory}
+              onSelectCategory={(cat) => {
+                handleOpenCategory(cat);
+              }}
+              isArabic={isArabic}
+            />
+          </div>
+
+          {/* Coordinated Outfit Bundles Feature Section */}
+          <BundlesSection
+            bundles={bundles}
+            productsMap={productsMap}
+            onSelectBundle={(bundle) => setActiveBundle(bundle)}
+            currency={currency}
+            currencyRate={CURRENCY_RATES[currency]}
             isArabic={isArabic}
           />
-        )}
-      </main>
 
-      {/* Footer */}
-      <Footer
-        onOpenSizeGuide={() => setIsSizeGuideOpen(true)}
-        onOpenOrderTracking={() => setIsOrderTrackingOpen(true)}
-        onOpenProfile={() => setIsProfileOpen(true)}
-        onAdminTrigger={() => setIsAdminLoginOpen(true)}
-        isArabic={isArabic}
-      />
+          {/* New Arrivals & Best Sellers Showcase */}
+          <HomeStoreView
+            products={products}
+            onSelectProduct={(p, colorId) => {
+              setActiveProduct(p);
+              setActiveColorId(colorId);
+            }}
+            onQuickAdd={handleQuickAdd}
+            currency={currency}
+            currencyRate={CURRENCY_RATES[currency]}
+            isArabic={isArabic}
+            onViewAllCategory={(cat) => {
+              handleOpenCategory(cat);
+            }}
+            onOpenBundleById={handleOpenBundleById}
+          />
 
-      {/* Floating WhatsApp Action Button */}
+          {/* Seasonal Promo Showcase Banners */}
+          <PromoBannerShowcase
+            isArabic={isArabic}
+            onShopTees={() => {
+              handleOpenCategory('tops');
+            }}
+            onShopJackets={() => {
+              handleOpenCategory('tops');
+            }}
+          />
+
+          {/* Complete Store Catalog with Interactive Filter & Sort Header */}
+          <section id="all-products-catalog" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-200">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-neutral-900">
+                  {isArabic ? 'كافة المنتجات والمعروضات' : 'All Catalog Collection'}
+                </h2>
+                <p className="text-xs text-neutral-700 mt-1">
+                  {isArabic
+                    ? `عرض ${filteredProducts.length} من إجمالي ${products.length} منتج متاح`
+                    : `Showing ${filteredProducts.length} of ${products.length} products`}
+                </p>
+              </div>
+
+              {/* Quick Toolbar */}
+              <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                <button
+                  type="button"
+                  onClick={() => setIsFilterOpen(true)}
+                  className="px-3.5 py-2 border border-neutral-300 rounded text-xs font-bold uppercase tracking-wider hover:border-black transition flex items-center space-x-2 rtl:space-x-reverse cursor-pointer"
+                >
+                  <span>{isArabic ? 'تصفية وفرز' : 'Filter & Sort'}</span>
+                  {activeFilterCount > 0 && (
+                    <span className="w-5 h-5 rounded-full bg-black text-white text-[10px] flex items-center justify-center font-bold">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Products Grid */}
+            <div className="pt-6">
+              <ProductGrid
+                products={filteredProducts}
+                onSelectProduct={(p, colorId) => {
+                  setActiveProduct(p);
+                  setActiveColorId(colorId);
+                }}
+                onQuickAdd={handleQuickAdd}
+                currency={currency}
+                currencyRate={CURRENCY_RATES[currency]}
+                isArabic={isArabic}
+                onOpenFilterDrawer={() => setIsFilterOpen(true)}
+              />
+            </div>
+          </section>
+        </main>
+      )}
+
+      {/* Floating Instant WhatsApp Button */}
       <FloatingWhatsApp isArabic={isArabic} />
 
-      {/* Customer Profile & Saved Address / Orders Modal */}
-      <CustomerProfileModal
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        profile={customerProfile}
-        orders={customerOrders}
-        onSaveProfile={handleSaveCustomerProfile}
-        currency={currency}
-        currencyRate={CURRENCY_RATES[currency]}
-        isArabic={isArabic}
-      />
-
-      {/* Bundle Customization Modal */}
-      <BundleModal
-        bundle={activeBundle}
-        productsMap={productsMap}
-        onClose={() => setActiveBundle(null)}
-        onAddBundleToCart={handleAddBundleToCart}
-        onOpenSizeGuide={() => setIsSizeGuideOpen(true)}
-        currency={currency}
-        currencyRate={CURRENCY_RATES[currency]}
-        isArabic={isArabic}
-      />
-
-      {/* Product Detail Modal */}
-      <ProductModal
-        product={activeProduct}
-        initialColorId={activeColorId}
-        allProducts={products}
-        onClose={() => {
-          setActiveProduct(null);
-          setActiveColorId(undefined);
+      {/* Global Footer */}
+      <Footer
+        onOpenCategory={(cat) => {
+          handleOpenCategory(cat);
         }}
-        onAddToCart={handleAddToCart}
-        onOpenBundleModal={handleOpenBundleById}
-        onSelectProductById={handleSelectProductById}
-        onOpenCategory={(cat) => handleOpenCategory(cat)}
         onOpenSizeGuide={() => setIsSizeGuideOpen(true)}
-        currency={currency}
-        currencyRate={CURRENCY_RATES[currency]}
+        onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
+        onOpenOrderTracking={() => setIsOrderTrackingOpen(true)}
         isArabic={isArabic}
       />
 
@@ -946,20 +1087,22 @@ export default function App() {
         onClose={() => setIsCartOpen(false)}
         items={cartItems}
         onUpdateQuantity={handleUpdateQuantity}
-        onRemoveItem={handleRemoveFromCart}
-        onProceedToCheckout={() => {
+        onRemoveItem={handleRemoveItem}
+        onCheckout={() => {
           setIsCartOpen(false);
           setIsCheckoutOpen(true);
         }}
+        subtotal={subtotal}
+        discountAmount={discountAmount}
+        promoCode={promoCode}
+        onApplyPromo={handleApplyPromo}
         currency={currency}
         currencyRate={CURRENCY_RATES[currency]}
-        promoCode={promoCode}
-        discountAmount={discountAmount}
-        onApplyPromo={handleApplyPromo}
         isArabic={isArabic}
+        onOpenSizeGuide={() => setIsSizeGuideOpen(true)}
       />
 
-      {/* Checkout Modal with Vodafone Cash, InstaPay, and Governorates Delivery Fees */}
+      {/* Fast Checkout Modal */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
@@ -969,14 +1112,47 @@ export default function App() {
         promoCode={promoCode}
         currency={currency}
         currencyRate={CURRENCY_RATES[currency]}
-        onClearCart={() => {
-          setCartItems([]);
-          setDiscountAmount(0);
-          setPromoCode('');
-        }}
+        onClearCart={handleClearCart}
         savedProfile={customerProfile}
         onSaveProfile={handleSaveCustomerProfile}
         onAddOrder={handleAddCustomerOrder}
+        isArabic={isArabic}
+      />
+
+      {/* Product Detail Modal */}
+      <ProductModal
+        product={activeProduct}
+        initialColorId={activeColorId}
+        onClose={() => {
+          setActiveProduct(null);
+          setActiveColorId(undefined);
+        }}
+        onAddToCart={handleAddToCart}
+        currency={currency}
+        currencyRate={CURRENCY_RATES[currency]}
+        isArabic={isArabic}
+        onOpenSizeGuide={() => setIsSizeGuideOpen(true)}
+        onSelectProductById={handleSelectProductById}
+      />
+
+      {/* Coordinated Outfit Bundle Modal */}
+      <BundleModal
+        bundle={activeBundle}
+        onClose={() => setActiveBundle(null)}
+        productsMap={productsMap}
+        onAddBundleToCart={handleAddBundleToCart}
+        currency={currency}
+        currencyRate={CURRENCY_RATES[currency]}
+        isArabic={isArabic}
+      />
+
+      {/* Customer Profile & Address Book Modal */}
+      <CustomerProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        profile={customerProfile}
+        onSaveProfile={handleSaveCustomerProfile}
+        orders={customerOrders}
         isArabic={isArabic}
       />
 
@@ -1090,6 +1266,7 @@ export default function App() {
         onSaveBundles={handleSaveBundles}
         orders={customerOrders}
         onUpdateOrderStatus={handleUpdateOrderStatus}
+        onUpdateOrders={setCustomerOrders}
         onResetDefaults={handleResetDefaults}
         isArabic={isArabic}
       />

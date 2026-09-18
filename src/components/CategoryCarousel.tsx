@@ -34,7 +34,7 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
               >
                 {/* Category Image Card */}
                 <div
-                  className={`relative w-32 sm:w-40 aspect-[4/5] rounded-sm overflow-hidden bg-neutral-100 border transition-all duration-200 ${
+                  className={`relative w-32 sm:w-40 aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden bg-neutral-100 border transition-all duration-200 ${
                     isSelected
                       ? 'border-neutral-900 ring-2 ring-neutral-900 shadow-md'
                       : 'border-neutral-200 group-hover:border-neutral-400'

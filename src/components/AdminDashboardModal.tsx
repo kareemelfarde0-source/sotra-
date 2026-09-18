@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Plus,
@@ -9,7 +9,6 @@ import {
   Check,
   Package,
   Layers,
-  Sparkles,
   Link as LinkIcon,
   RefreshCw,
   LogOut,
@@ -21,12 +20,25 @@ import {
   DollarSign,
   ShoppingCart,
   Users,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Database,
+  Shield
 } from 'lucide-react';
 import { Product, StoreCategory, OutfitBundle, ProductColor, ProductSize, CustomerOrder, OrderStatusType } from '../types';
 import { AdminOrdersTab } from './admin/AdminOrdersTab';
 import { AdminCustomersTab } from './admin/AdminCustomersTab';
 import { AdminSettingsTab } from './admin/AdminSettingsTab';
+import { AdminBackupTab } from './admin/AdminBackupTab';
+import { AdminUsersTab } from './admin/AdminUsersTab';
+import { getCurrentAdminUser, getAllowedTabsForRole } from '../utils/adminAuth';
+import {
+  deleteProductFromFirestore,
+  deleteCategoryFromFirestore,
+  deleteBundleFromFirestore,
+  saveProductToFirestore,
+  saveCategoryToFirestore,
+  saveBundleToFirestore
+} from '../firebase/db';
 
 interface AdminDashboardModalProps {
   isOpen: boolean;
@@ -40,6 +52,7 @@ interface AdminDashboardModalProps {
   onSaveBundles: (bundles: OutfitBundle[]) => void;
   orders?: CustomerOrder[];
   onUpdateOrderStatus?: (orderId: string, newStatus: OrderStatusType) => void;
+  onUpdateOrders?: (orders: CustomerOrder[]) => void;
   onResetDefaults: () => void;
   isArabic: boolean;
 }
@@ -56,12 +69,26 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   onSaveBundles,
   orders = [],
   onUpdateOrderStatus,
+  onUpdateOrders,
   onResetDefaults,
   isArabic
 }) => {
+  const currentUser = getCurrentAdminUser();
+  const allowedTabs = getAllowedTabsForRole(currentUser?.role || 'admin');
+
   const [activeTab, setActiveTab] = useState<
-    'products' | 'categories' | 'look_coordination' | 'bundles' | 'orders' | 'customers' | 'settings'
-  >('products');
+    'products' | 'categories' | 'look_coordination' | 'bundles' | 'orders' | 'customers' | 'settings' | 'backup' | 'users'
+  >(() => {
+    const tabs = getAllowedTabsForRole(currentUser?.role || 'admin');
+    return (tabs[0] as any) || 'products';
+  });
+
+  // Keep activeTab synchronized with permissions
+  useEffect(() => {
+    if (!allowedTabs.includes(activeTab)) {
+      setActiveTab((allowedTabs[0] as any) || 'products');
+    }
+  }, [currentUser?.role, allowedTabs, activeTab]);
 
   // Search & Filter state for products tab
   const [productSearch, setProductSearch] = useState('');
@@ -114,6 +141,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     if (window.confirm(isArabic ? 'هل أنت متأكد من حذف هذا المنتج؟' : 'Are you sure you want to delete this product?')) {
       const updated = products.filter((p) => p.id !== id);
       onSaveProducts(updated);
+      deleteProductFromFirestore(id).catch(console.error);
       showNotification(isArabic ? 'تم حذف المنتج' : 'Product deleted');
     }
   };
@@ -127,6 +155,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       updated = products.map((p) => (p.id === prod.id ? prod : p));
     }
     onSaveProducts(updated);
+    saveProductToFirestore(prod).catch(console.error);
     setEditingProduct(null);
     setIsCreatingProduct(false);
     showNotification(isArabic ? 'تم حفظ المنتج بنجاح' : 'Product saved successfully');
@@ -141,6 +170,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       updated = categories.map((c) => (c.id === cat.id ? cat : c));
     }
     onSaveCategories(updated);
+    saveCategoryToFirestore(cat).catch(console.error);
     setEditingCategory(null);
     setIsCreatingCategory(false);
     showNotification(isArabic ? 'تم حفظ بيانات القسم' : 'Category saved');
@@ -155,6 +185,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     if (window.confirm(isArabic ? 'هل تريد بالتأكيد حذف هذا القسم؟' : 'Delete this category?')) {
       const updated = categories.filter((c) => c.id !== catId);
       onSaveCategories(updated);
+      deleteCategoryFromFirestore(catId).catch(console.error);
       showNotification(isArabic ? 'تم حذف القسم' : 'Category deleted');
     }
   };
@@ -163,7 +194,9 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const toggleShopByCategory = (catId: string) => {
     const updated = categories.map((c) => {
       if (c.id === catId) {
-        return { ...c, showInShopByCategory: !c.showInShopByCategory };
+        const toggled = { ...c, showInShopByCategory: !c.showInShopByCategory };
+        saveCategoryToFirestore(toggled).catch(console.error);
+        return toggled;
       }
       return c;
     });
@@ -180,6 +213,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       updated = bundles.map((b) => (b.id === bundle.id ? bundle : b));
     }
     onSaveBundles(updated);
+    saveBundleToFirestore(bundle).catch(console.error);
     setEditingBundle(null);
     setIsCreatingBundle(false);
     showNotification(isArabic ? 'تم حفظ الطقم والتنسيقة الكاملة' : 'Bundle saved successfully');
@@ -190,6 +224,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     if (window.confirm(isArabic ? 'هل تريد حذف هذا الطقم؟' : 'Delete this bundle?')) {
       const updated = bundles.filter((b) => b.id !== bundleId);
       onSaveBundles(updated);
+      deleteBundleFromFirestore(bundleId).catch(console.error);
       showNotification(isArabic ? 'تم حذف الطقم' : 'Bundle deleted');
     }
   };
@@ -209,14 +244,21 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
       <div className="relative w-full max-w-6xl h-[94vh] bg-white text-neutral-900 rounded-xl shadow-2xl flex flex-col overflow-hidden border border-neutral-200">
         {/* Top Bar */}
-        <div className="p-4 bg-neutral-950 text-white flex items-center justify-between border-b border-neutral-800 shrink-0">
+        <div className="p-3 sm:p-4 bg-neutral-950 text-white flex items-center justify-between border-b border-neutral-800 shrink-0">
           <div className="flex items-center space-x-3 rtl:space-x-reverse">
-            <span className="font-stencil font-black text-xl tracking-[0.25em] uppercase text-white">
+            <span className="font-stencil font-black text-lg sm:text-xl tracking-[0.25em] uppercase text-white">
               SOTRA
             </span>
-            <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-white text-black rounded">
-              {isArabic ? 'لوحة الإدارة الشاملة' : 'Admin Panel'}
-            </span>
+            {currentUser && (
+              <div className="flex items-center space-x-1.5 rtl:space-x-reverse">
+                <span className="text-xs text-neutral-300 font-medium hidden sm:inline">
+                  {isArabic ? currentUser.nameAr : currentUser.nameEn}
+                </span>
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-neutral-800 text-neutral-300 border border-neutral-700 rounded uppercase">
+                  {currentUser.role}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-2 rtl:space-x-reverse">
@@ -251,98 +293,142 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
           </div>
         )}
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs (Filtered by Role Permissions) */}
         <div className="flex border-b border-neutral-200 bg-neutral-50 overflow-x-auto no-scrollbar shrink-0 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setActiveTab('products')}
-            className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'products'
-                ? 'border-black text-black bg-white'
-                : 'border-transparent text-neutral-500 hover:text-black'
-            }`}
-          >
-            <Package className="w-4 h-4" />
-            <span>{isArabic ? `المنتجات والترتيب (${products.length})` : `Products & Order (${products.length})`}</span>
-          </button>
+          {allowedTabs.includes('products') && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('products')}
+              className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'products'
+                  ? 'border-black text-black bg-white'
+                  : 'border-transparent text-neutral-500 hover:text-black'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              <span>{isArabic ? `المنتجات والترتيب (${products.length})` : `Products & Order (${products.length})`}</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('categories')}
-            className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'categories'
-                ? 'border-black text-black bg-white'
-                : 'border-transparent text-neutral-500 hover:text-black'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>{isArabic ? `الأقسام وتسوق حسب الأقسام (${categories.length})` : `Categories (${categories.length})`}</span>
-          </button>
+          {allowedTabs.includes('categories') && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('categories')}
+              className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'categories'
+                  ? 'border-black text-black bg-white'
+                  : 'border-transparent text-neutral-500 hover:text-black'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>{isArabic ? `الأقسام (${categories.length})` : `Categories (${categories.length})`}</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('look_coordination')}
-            className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'look_coordination'
-                ? 'border-black text-black bg-white'
-                : 'border-transparent text-neutral-500 hover:text-black'
-            }`}
-          >
-            <LinkIcon className="w-4 h-4" />
-            <span>{isArabic ? 'القطع المكملة وتنسيقات الإطلالة' : 'Complementary & Look'}</span>
-          </button>
+          {allowedTabs.includes('look_coordination') && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('look_coordination')}
+              className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'look_coordination'
+                  ? 'border-black text-black bg-white'
+                  : 'border-transparent text-neutral-500 hover:text-black'
+              }`}
+            >
+              <LinkIcon className="w-4 h-4" />
+              <span>{isArabic ? 'القطع المكملة للإطلالة' : 'Complementary Items'}</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('bundles')}
-            className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'bundles'
-                ? 'border-black text-black bg-white'
-                : 'border-transparent text-neutral-500 hover:text-black'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>{isArabic ? `الأطقم والتنسيقات الكاملة (${bundles.length})` : `Outfit Sets (${bundles.length})`}</span>
-          </button>
+          {allowedTabs.includes('bundles') && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('bundles')}
+              className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'bundles'
+                  ? 'border-black text-black bg-white'
+                  : 'border-transparent text-neutral-500 hover:text-black'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>{isArabic ? `الأطقم والتنسيقات (${bundles.length})` : `Outfit Sets (${bundles.length})`}</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('orders')}
-            className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'orders'
-                ? 'border-black text-black bg-white'
-                : 'border-transparent text-neutral-500 hover:text-black'
-            }`}
-          >
-            <ShoppingCart className="w-4 h-4" />
-            <span>{isArabic ? `الطلبات والشحن (${orders.length})` : `Orders (${orders.length})`}</span>
-          </button>
+          {allowedTabs.includes('orders') && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('orders')}
+              className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'orders'
+                  ? 'border-black text-black bg-white'
+                  : 'border-transparent text-neutral-500 hover:text-black'
+              }`}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>{isArabic ? `الطلبات والشحن (${orders.length})` : `Orders (${orders.length})`}</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('customers')}
-            className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'customers'
-                ? 'border-black text-black bg-white'
-                : 'border-transparent text-neutral-500 hover:text-black'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>{isArabic ? 'العملاء المسجلين' : 'Customers'}</span>
-          </button>
+          {allowedTabs.includes('customers') && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('customers')}
+              className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'customers'
+                  ? 'border-black text-black bg-white'
+                  : 'border-transparent text-neutral-500 hover:text-black'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>{isArabic ? 'سجل العملاء' : 'Customers'}</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('settings')}
-            className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'settings'
-                ? 'border-black text-black bg-white'
-                : 'border-transparent text-neutral-500 hover:text-black'
-            }`}
-          >
-            <SettingsIcon className="w-4 h-4" />
-            <span>{isArabic ? 'إعدادات المتجر الشاملة' : 'Store Settings'}</span>
-          </button>
+          {allowedTabs.includes('settings') && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'settings'
+                  ? 'border-black text-black bg-white'
+                  : 'border-transparent text-neutral-500 hover:text-black'
+              }`}
+            >
+              <SettingsIcon className="w-4 h-4" />
+              <span>{isArabic ? 'إعدادات المتجر والدفع' : 'Store Settings'}</span>
+            </button>
+          )}
+
+          {allowedTabs.includes('backup') && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('backup')}
+              className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'backup'
+                  ? 'border-black text-black bg-white'
+                  : 'border-transparent text-neutral-500 hover:text-black'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              <span>{isArabic ? 'النسخ الاحتياطي والحذف' : 'Backup & Data'}</span>
+            </button>
+          )}
+
+          {allowedTabs.includes('users') && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('users')}
+              className={`py-3 px-4 border-b-2 flex items-center space-x-2 rtl:space-x-reverse whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'users'
+                  ? 'border-black text-black bg-white'
+                  : 'border-transparent text-neutral-500 hover:text-black'
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              <span>{isArabic ? 'الصلاحيات والمستخدمين' : 'Roles & Logins'}</span>
+            </button>
+          )}
         </div>
 
         {/* Tab Content Container */}
@@ -1027,6 +1113,31 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* TAB 8: BACKUP, RESTORE & PURGE */}
+          {activeTab === 'backup' && allowedTabs.includes('backup') && (
+            <AdminBackupTab
+              products={products}
+              categories={categories}
+              bundles={bundles}
+              orders={orders}
+              onSaveProducts={onSaveProducts}
+              onSaveCategories={onSaveCategories}
+              onSaveBundles={onSaveBundles}
+              onUpdateOrders={onUpdateOrders || (() => {})}
+              onResetDefaults={onResetDefaults}
+              isArabic={isArabic}
+              onNotify={(msg) => showNotification(msg)}
+            />
+          )}
+
+          {/* TAB 9: USERS, PASSWORDS & ROLE PERMISSIONS */}
+          {activeTab === 'users' && allowedTabs.includes('users') && (
+            <AdminUsersTab
+              isArabic={isArabic}
+              onNotify={(msg) => showNotification(msg)}
+            />
+          )}
         </div>
 
         {/* ========================================================= */}
@@ -1108,25 +1219,39 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase text-neutral-700 mb-1">
-                      {isArabic ? 'شارة التميز (Badge)' : 'Badge'}
-                    </label>
-                    <select
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold uppercase text-neutral-700">
+                        {isArabic ? 'شارة التميز المكتوبة (Badge)' : 'Custom Badge Text'}
+                      </label>
+                      {editingProduct.badge && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingProduct({ ...editingProduct, badge: undefined })}
+                          className="text-[10px] text-red-600 hover:underline cursor-pointer"
+                        >
+                          {isArabic ? 'مسح الشارة' : 'Clear'}
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={isArabic ? 'اكتب نص الشارة هنا (مثال: الأكثر طلباً، حصري، قطعة أخيرة)' : 'e.g. BESTSELLER, HOT, LIMITED'}
                       value={editingProduct.badge || ''}
-                      onChange={(e) =>
-                        setEditingProduct({
-                          ...editingProduct,
-                          badge: (e.target.value || undefined) as any
-                        })
-                      }
-                      className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-300 rounded text-xs font-bold cursor-pointer"
-                    >
-                      <option value="">{isArabic ? 'بدون شارة' : 'None'}</option>
-                      <option value="BESTSELLER">BESTSELLER (الأكثر مبيعاً)</option>
-                      <option value="NEW">NEW (وصل حديثاً)</option>
-                      <option value="HOT">HOT (مميز)</option>
-                      <option value="RESTOCKED">RESTOCKED (تم إعادة التوفير)</option>
-                    </select>
+                      onChange={(e) => setEditingProduct({ ...editingProduct, badge: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-300 rounded text-xs font-bold"
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {['الأكثر طلباً', 'وصل حديثاً', 'إصدار حصري', 'BESTSELLER', 'NEW', 'HOT'].map((suggest) => (
+                        <button
+                          key={suggest}
+                          type="button"
+                          onClick={() => setEditingProduct({ ...editingProduct, badge: suggest })}
+                          className="px-1.5 py-0.5 bg-neutral-200 hover:bg-black hover:text-white text-neutral-800 text-[10px] font-bold rounded transition cursor-pointer"
+                        >
+                          {suggest}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 

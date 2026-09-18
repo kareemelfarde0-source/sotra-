@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, ArrowRight, ArrowLeft, Layers, ShoppingBag, ExternalLink, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Layers, ShoppingBag, ExternalLink, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 import { ProductPromoBanner, CategoryTab } from '../types';
 import { FEATURED_PROMO_BANNERS } from '../data/products';
 
@@ -131,7 +131,7 @@ export const PromoBannerShowcase: React.FC<PromoBannerShowcaseProps> = ({
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-3 h-3 mr-1 rtl:ml-1" />
+                      <Flame className="w-3 h-3 mr-1 rtl:ml-1 text-red-500" />
                       <span>{isArabic ? (currentBanner.badgeAr || 'تشكيلة مميزة') : (currentBanner.badge || 'FEATURED')}</span>
                     </>
                   )}

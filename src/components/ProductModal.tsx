@@ -9,7 +9,6 @@ import {
   Plus,
   Minus,
   ShoppingBag,
-  Sparkles,
   Layers,
   ArrowUpRight
 } from 'lucide-react';
@@ -561,7 +560,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4">
                     <div className="flex items-center space-x-2.5 rtl:space-x-reverse">
                       <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 shadow-sm">
-                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <Layers className="w-4 h-4 text-white" />
                       </div>
                       <div>
                         <div className="flex items-center space-x-2 rtl:space-x-reverse">

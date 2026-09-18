@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, ArrowRight, Check, Sparkles } from 'lucide-react';
+import { Layers, ArrowRight, Check } from 'lucide-react';
 import { OutfitBundle, CurrencyCode, Product } from '../types';
 
 interface BundleCardProps {
@@ -42,12 +42,11 @@ export const BundleCard: React.FC<BundleCardProps> = ({
       onClick={() => onOpenBundleModal(bundle)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative bg-white border border-neutral-200 rounded-sm overflow-hidden flex flex-col transition-all duration-300 hover:shadow-xl hover:border-neutral-900 cursor-pointer"
+      className="group relative bg-white border border-neutral-200 rounded-lg sm:rounded-xl overflow-hidden flex flex-col transition-all duration-300 hover:shadow-xl hover:border-neutral-900 cursor-pointer"
     >
       {/* Set Badge */}
       <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 items-start">
-        <span className="bg-red-600 text-white text-[10px] sm:text-xs font-black tracking-wider px-2.5 py-1 uppercase shadow-md flex items-center space-x-1">
-          <Sparkles className="w-3 h-3 shrink-0" />
+        <span className="bg-red-600 text-white text-[10px] sm:text-xs font-black tracking-wider px-2.5 py-1 uppercase shadow-md flex items-center">
           <span>{isArabic ? `خصم ${bundle.discountPercent}% على الطقم` : `SAVE ${bundle.discountPercent}% ON SET`}</span>
         </span>
         {bundle.badge && (

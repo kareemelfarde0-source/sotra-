@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { Layers, ArrowLeft, ArrowRight } from 'lucide-react';
 import { OutfitBundle, Product, CurrencyCode, CategoryTab } from '../types';
 import { CATEGORIES_DATA } from '../data/products';
 import { BundleCard } from './BundleCard';

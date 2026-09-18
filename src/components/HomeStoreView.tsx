@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, Sparkles, LayoutGrid, SlidersHorizontal, Flame, Compass, ShoppingBag } from 'lucide-react';
+import { ArrowRight, ArrowLeft, LayoutGrid, SlidersHorizontal, Flame, Compass, ShoppingBag } from 'lucide-react';
 import { Product, OutfitBundle, CurrencyCode, CategoryTab, StoreCategory } from '../types';
 import { ProductCard } from './ProductCard';
 import { CategoryCarousel } from './CategoryCarousel';
@@ -307,7 +307,7 @@ export const HomeStoreView: React.FC<HomeStoreViewProps> = ({
               onClick={() => {
                 onOpenCategory(tile.id);
               }}
-              className="group relative aspect-[3/4] sm:aspect-[4/5] overflow-hidden bg-neutral-100 rounded-sm cursor-pointer shadow-sm"
+              className="group relative aspect-[3/4] sm:aspect-[4/5] overflow-hidden bg-neutral-100 rounded-lg sm:rounded-xl cursor-pointer shadow-sm"
             >
               <img
                 src={tile.image}
@@ -358,8 +358,7 @@ export const HomeStoreView: React.FC<HomeStoreViewProps> = ({
       <section id="bundles-showcase" className="max-w-7xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 pb-2 border-b border-neutral-200 gap-2">
           <div>
-            <div className="inline-flex items-center space-x-1.5 rtl:space-x-reverse text-red-600 font-extrabold text-[11px] uppercase tracking-widest mb-1">
-              <Sparkles className="w-3.5 h-3.5 fill-red-600" />
+            <div className="inline-flex items-center text-red-600 font-extrabold text-[11px] uppercase tracking-widest mb-1">
               <span>{isArabic ? 'تنسيقات كاملة بخصم خاص' : 'COMPLETE OUTFIT BUNDLES'}</span>
             </div>
             <h2 className="text-xl sm:text-2xl md:text-3xl font-black uppercase tracking-tight text-neutral-950 font-heading">

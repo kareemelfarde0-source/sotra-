@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, ArrowRight, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { X } from 'lucide-react';
 import { SitePromoPopup, CategoryTab } from '../types';
 
 interface PromoPopupModalProps {
@@ -21,7 +21,7 @@ export const PromoPopupModal: React.FC<PromoPopupModalProps> = ({
 }) => {
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
-  if (!isOpen || !popup.enabled) return null;
+  if (!isOpen || !popup.enabled || !popup.imageUrl) return null;
 
   const handleDismiss = () => {
     if (dontShowAgain) {
@@ -43,87 +43,85 @@ export const PromoPopupModal: React.FC<PromoPopupModalProps> = ({
     }
   };
 
+  // Determine container width based on size settings
+  const getMaxWidthClass = () => {
+    switch (popup.size) {
+      case 'sm':
+        return 'max-w-[360px]';
+      case 'md':
+        return 'max-w-[480px]';
+      case 'lg':
+        return 'max-w-[620px]';
+      case 'xl':
+        return 'max-w-[760px]';
+      case 'custom':
+        return '';
+      default:
+        return 'max-w-[480px]';
+    }
+  };
+
+  const customStyle =
+    popup.size === 'custom' && popup.customWidth
+      ? { maxWidth: `${Math.min(popup.customWidth, 900)}px` }
+      : undefined;
+
+  const isClickable = popup.targetType && popup.targetType !== 'none' && popup.targetId;
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-300">
-      <div className="relative w-full max-w-md bg-white rounded-lg shadow-2xl overflow-hidden border border-neutral-200">
-        {/* Close Button */}
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-300">
+      <div
+        className={`relative w-full ${getMaxWidthClass()} bg-transparent flex flex-col items-center animate-in zoom-in-95 duration-200`}
+        style={customStyle}
+      >
+        {/* Floating Close Button */}
         <button
           onClick={handleDismiss}
-          className="absolute top-3 right-3 rtl:right-auto rtl:left-3 z-10 w-8 h-8 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center transition cursor-pointer"
+          className="absolute -top-3.5 -right-3.5 rtl:-right-auto rtl:-left-3.5 z-20 w-9 h-9 rounded-full bg-black/90 hover:bg-black text-white flex items-center justify-center border-2 border-white/60 shadow-xl transition hover:scale-105 cursor-pointer"
           aria-label="Close"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5" />
         </button>
 
-        {/* Promo Image */}
-        {popup.imageUrl && (
-          <div
-            onClick={handleAction}
-            className="relative w-full h-64 sm:h-72 bg-neutral-900 cursor-pointer overflow-hidden group"
-          >
-            <img
-              src={popup.imageUrl}
-              alt={popup.titleEn || popup.titleAr}
-              className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+        {/* Pure Image Container - Strictly Image Only without overlay text */}
+        <div
+          onClick={isClickable ? handleAction : undefined}
+          className={`relative w-full rounded-xl overflow-hidden shadow-2xl bg-neutral-900 border border-neutral-800 ${
+            isClickable ? 'cursor-pointer group' : ''
+          }`}
+        >
+          <img
+            src={popup.imageUrl}
+            alt="SOTRA Promotion"
+            className={`w-full h-auto max-h-[82vh] object-contain mx-auto block ${
+              isClickable ? 'group-hover:scale-[1.01] transition-transform duration-300' : ''
+            }`}
+          />
+        </div>
+
+        {/* Sleek Bottom Control (Don't show again) */}
+        <div className="mt-3 flex items-center justify-between w-full px-2 py-1 text-xs text-white/90">
+          <label className="flex items-center space-x-2 rtl:space-x-reverse cursor-pointer select-none bg-black/60 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-sm hover:bg-black/80 transition">
+            <input
+              type="checkbox"
+              checked={dontShowAgain}
+              onChange={(e) => setDontShowAgain(e.target.checked)}
+              className="w-3.5 h-3.5 accent-white rounded cursor-pointer"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
-            
-            <div className="absolute bottom-3 left-4 right-4 text-white">
-              <span className="inline-flex items-center space-x-1 rtl:space-x-reverse text-[10px] font-black tracking-widest uppercase bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded text-white mb-1.5">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                <span>{isArabic ? 'عرض خاص ومميز' : 'SPECIAL OFFER'}</span>
-              </span>
-              <h3 className="text-lg sm:text-xl font-black uppercase font-heading leading-tight drop-shadow">
-                {isArabic && popup.titleAr ? popup.titleAr : popup.titleEn}
-              </h3>
-            </div>
-          </div>
-        )}
-
-        {/* Content Body */}
-        <div className="p-4 sm:p-5 space-y-4">
-          {(popup.subtitleAr || popup.subtitleEn) && (
-            <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-              {isArabic && popup.subtitleAr ? popup.subtitleAr : popup.subtitleEn}
-            </p>
-          )}
-
-          {/* Action CTA button */}
-          <button
-            onClick={handleAction}
-            className="w-full py-3 bg-black hover:bg-neutral-800 text-white font-black text-xs uppercase tracking-widest transition flex items-center justify-center space-x-2 rtl:space-x-reverse cursor-pointer shadow-md rounded"
-          >
-            <span>
-              {isArabic
-                ? popup.buttonTextAr || 'تسوق الآن'
-                : popup.buttonTextEn || 'SHOP NOW'}
+            <span className="text-[11px] font-medium text-neutral-200">
+              {isArabic ? 'عدم إظهار هذه النافذة مرة أخرى' : "Don't show this again"}
             </span>
-            <ArrowRight className="w-4 h-4 rtl:rotate-180" />
+          </label>
+
+          <button
+            onClick={handleDismiss}
+            className="text-[11px] text-neutral-400 hover:text-white px-2.5 py-1 rounded bg-black/40 hover:bg-black/70 border border-white/10 transition cursor-pointer"
+          >
+            {isArabic ? 'إغلاق' : 'Close'}
           </button>
-
-          {/* Don't show again checkbox */}
-          <div className="pt-2 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-500">
-            <label className="flex items-center space-x-2 rtl:space-x-reverse cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={dontShowAgain}
-                onChange={(e) => setDontShowAgain(e.target.checked)}
-                className="w-3.5 h-3.5 accent-black rounded cursor-pointer"
-              />
-              <span className="hover:text-black">
-                {isArabic ? 'لا تظهر هذه الرسالة مرة أخرى' : "Don't show this again"}
-              </span>
-            </label>
-
-            <button
-              onClick={handleDismiss}
-              className="text-neutral-400 hover:text-black font-semibold text-[11px] cursor-pointer"
-            >
-              {isArabic ? 'إغلاق' : 'Dismiss'}
-            </button>
-          </div>
         </div>
       </div>
     </div>
   );
 };
+

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Heart, Check, Star } from 'lucide-react';
+import { ShoppingBag, Heart, Check } from 'lucide-react';
 import { Product, CurrencyCode } from '../types';
 
 interface ProductCardProps {
@@ -59,7 +59,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Product Image Area with Badges & Floating Quick Add */}
-      <div className="relative aspect-[3/4] w-full bg-neutral-100 overflow-hidden">
+      <div className="relative aspect-[3/4] w-full bg-neutral-100 overflow-hidden rounded-lg sm:rounded-xl">
         <img
           src={displayImage}
           alt={`${product.name} - ${activeColor.name}`}
@@ -67,14 +67,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           loading="lazy"
         />
 
-        {/* Top Left Badges (Red Discount Pill or White Status Pill) */}
-        <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
+        {/* Top Left Badges (Red Discount Pill and/or Custom Written Badge) */}
+        <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
           {product.discountPercent && product.discountPercent > 0 ? (
             <span className="bg-red-600 text-white text-[9px] sm:text-[10px] font-black tracking-wider px-1.5 py-0.5 uppercase shadow-xs">
               {product.discountPercent}% OFF
             </span>
-          ) : product.badge ? (
-            <span className="bg-white text-black border border-neutral-300 text-[9px] sm:text-[10px] font-bold tracking-widest px-1.5 py-0.5 uppercase shadow-xs">
+          ) : null}
+          {product.badge ? (
+            <span className="bg-neutral-900 text-white text-[9px] sm:text-[10px] font-bold tracking-wider px-1.5 py-0.5 shadow-xs">
               {product.badge}
             </span>
           ) : null}

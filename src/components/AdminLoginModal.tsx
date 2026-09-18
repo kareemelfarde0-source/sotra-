@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Lock, Shield, ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react';
+import {
+  authenticateAdmin,
+  getRememberedCredentials,
+  saveRememberedCredentials
+} from '../utils/adminAuth';
+import { AdminUser } from '../types';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (user?: AdminUser) => void;
   isArabic: boolean;
 }
 
@@ -16,7 +22,23 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const remembered = getRememberedCredentials();
+      if (remembered.remember && remembered.username) {
+        setUsername(remembered.username);
+        setPassword(remembered.password);
+        setRememberMe(true);
+      } else {
+        setUsername('');
+        setPassword('');
+      }
+      setError(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -24,21 +46,16 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    // Primary Credentials Check (admin / SOTRA20260)
-    if (username.trim() === 'admin' && password === 'SOTRA20260') {
-      try {
-        localStorage.setItem('sotra_admin_auth', 'true');
-      } catch (err) {
-        console.error('Storage error', err);
-      }
-      onSuccess();
-      setUsername('');
-      setPassword('');
+    const user = authenticateAdmin(username, password);
+
+    if (user) {
+      saveRememberedCredentials(username, password, rememberMe);
+      onSuccess(user);
     } else {
       setError(
         isArabic
-          ? 'اسم المستخدم أو كلمة المرور غير صحيحة'
-          : 'Invalid username or password'
+          ? 'بيانات الدخول غير صحيحة. يرجى التحقق من اسم المستخدم وكلمة المرور.'
+          : 'Invalid credentials. Please verify your username and password.'
       );
     }
   };
@@ -54,10 +71,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-black tracking-wider uppercase">
-                {isArabic ? 'لوحة التحكم والإدارة' : 'Administration Panel'}
+                {isArabic ? 'تسجيل دخول لوحة الإدارة' : 'Administration Login'}
               </h3>
               <span className="text-[10px] text-neutral-400 font-mono block">
-                SOTRA Fashion Admin
+                SOTRA Fashion Portal
               </span>
             </div>
           </div>
@@ -71,8 +88,13 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </button>
         </div>
 
-        {/* Login Form */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
+        {/* Form */}
+        <form
+          method="post"
+          onSubmit={handleSubmit}
+          className="p-5 sm:p-6 space-y-4"
+          autoComplete="on"
+        >
           {error && (
             <div className="p-3 bg-red-950/80 border border-red-800 text-red-300 text-xs rounded flex items-center space-x-2 rtl:space-x-reverse">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -80,33 +102,59 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             </div>
           )}
 
-          {/* Username Input - strictly without hint or placeholder */}
+          {/* Username Input with AutoFill support */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-1.5">
+            <label
+              htmlFor="admin-username"
+              className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-1.5"
+            >
               {isArabic ? 'اسم المستخدم' : 'Username'}
             </label>
             <input
+              id="admin-username"
+              name="username"
               type="text"
               required
-              autoFocus
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-700 rounded text-sm text-white focus:outline-none focus:border-white transition font-medium"
             />
           </div>
 
-          {/* Password Input - strictly without hint or placeholder */}
+          {/* Password Input with AutoFill support */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-1.5">
+            <label
+              htmlFor="admin-password"
+              className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-1.5"
+            >
               {isArabic ? 'كلمة المرور' : 'Password'}
             </label>
             <input
+              id="admin-password"
+              name="password"
               type="password"
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-700 rounded text-sm text-white focus:outline-none focus:border-white transition font-medium"
             />
+          </div>
+
+          {/* Remember Password Checkbox */}
+          <div className="flex items-center justify-between text-xs text-neutral-300 pt-1">
+            <label className="flex items-center space-x-2 rtl:space-x-reverse cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 accent-white rounded cursor-pointer"
+              />
+              <span className="text-[12px] font-medium text-neutral-300">
+                {isArabic ? 'حفظ كلمة المرور وبيانات الدخول' : 'Remember Password & Login'}
+              </span>
+            </label>
           </div>
 
           <div className="pt-2">
@@ -124,3 +172,4 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     </div>
   );
 };
+

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Check, ShoppingBag, Sparkles, Layers, ShieldCheck, Truck, RefreshCw } from 'lucide-react';
+import { X, Check, ShoppingBag, Layers, ShieldCheck, Truck, RefreshCw } from 'lucide-react';
 import { OutfitBundle, Product, CurrencyCode } from '../types';
 
 interface BundleModalProps {

@@ -189,7 +189,7 @@ export interface CustomerOrder {
   date: string;
   items: CartItem[];
   customer: CustomerProfile;
-  paymentMethod: 'vodafone_cash' | 'instapay' | 'cod';
+  paymentMethod: 'vodafone_cash' | 'instapay' | 'cod' | 'orange_cash' | 'etisalat_cash' | string;
   senderPhone?: string;
   transactionRef?: string;
   shippingFee: number;
@@ -202,6 +202,7 @@ export interface CustomerOrder {
   deliveredAt?: string;    // timestamp when delivered
   cancelledAt?: string;    // timestamp when cancelled
   notes?: string;
+  acknowledged?: boolean;  // whether admin has clicked "seen" / "رأيته"
 }
 
 export interface WalletSettings {
@@ -211,6 +212,12 @@ export interface WalletSettings {
   orangeCash: string;
   etisalatCash: string;
   requireShippingPayment: boolean; // إرسال رسوم الشحن إجباري
+  // Payment methods toggles
+  enableVodafoneCash?: boolean;
+  enableInstapay?: boolean;
+  enableCod?: boolean;
+  enableOrangeCash?: boolean;
+  enableEtisalatCash?: boolean;
 }
 
 export interface GovernorateRate {
@@ -252,14 +259,27 @@ export interface BroadcastNotification {
 export interface SitePromoPopup {
   enabled: boolean;
   imageUrl: string;
-  titleAr: string;
-  titleEn: string;
+  titleAr?: string;
+  titleEn?: string;
   subtitleAr?: string;
   subtitleEn?: string;
   buttonTextAr?: string;
   buttonTextEn?: string;
   targetType: 'none' | 'product' | 'category';
   targetId?: string; // productId or categoryId
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'custom';
+  customWidth?: number;
+}
+
+export type AdminRole = 'admin' | 'orders' | 'management' | 'data_entry';
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  password: string;
+  role: AdminRole;
+  nameAr: string;
+  nameEn: string;
 }
 
 export interface UserReview {

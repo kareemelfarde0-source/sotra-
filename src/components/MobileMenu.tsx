@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ChevronRight, Globe, DollarSign, Truck, ShieldCheck, Instagram, Headset, Flame, Sparkles } from 'lucide-react';
+import { X, ChevronRight, Globe, DollarSign, Truck, ShieldCheck, Instagram, Headset, Flame, Layers } from 'lucide-react';
 import { CategoryTab, CurrencyCode } from '../types';
 import { buildWhatsAppSupportUrl } from '../utils/whatsapp';
 
@@ -77,10 +77,10 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
 
             <button
               onClick={() => handleNav('sets')}
-              className="w-full flex items-center justify-between py-2.5 text-xs font-black uppercase tracking-wider text-red-600 bg-red-50/70 px-2 rounded-xs border border-red-100 hover:bg-red-100/70 transition"
+              className="w-full flex items-center justify-between py-2.5 text-xs font-black uppercase tracking-wider text-red-600 bg-red-50/70 px-2.5 rounded-lg border border-red-100 hover:bg-red-100/70 transition"
             >
               <div className="flex items-center space-x-2">
-                <Sparkles className="w-4 h-4 text-red-600" />
+                <Layers className="w-4 h-4 text-red-600" />
                 <span>{isArabic ? 'قسم الأطقم والتنسيقات (وفر حتى 30%)' : 'Outfit Sets & Bundles (Save 30%)'}</span>
               </div>
               <ChevronRight className="w-4 h-4 text-red-600" />

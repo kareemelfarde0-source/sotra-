@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, CheckCircle2, ShieldCheck, Truck, Smartphone, ArrowRight, Headset, Copy, Check, Info, CreditCard, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { CartItem, CurrencyCode, CustomerProfile, CustomerOrder, WalletSettings, GovernorateRate } from '../types';
@@ -59,10 +59,100 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [notes, setNotes] = useState('');
 
   // Payment State
-  const [paymentMethod, setPaymentMethod] = useState<'vodafone_cash' | 'instapay' | 'cod'>('vodafone_cash');
+  const [paymentMethod, setPaymentMethod] = useState<'vodafone_cash' | 'instapay' | 'cod' | 'orange_cash' | 'etisalat_cash'>('vodafone_cash');
   const [senderPhone, setSenderPhone] = useState('');
   const [transactionRef, setTransactionRef] = useState('');
   const [copiedAccount, setCopiedAccount] = useState<string | null>(null);
+
+  // Available Payment Methods based on Admin Settings
+  const availablePaymentMethods = useMemo(() => {
+    const list: Array<{
+      id: 'vodafone_cash' | 'instapay' | 'cod' | 'orange_cash' | 'etisalat_cash';
+      nameAr: string;
+      nameEn: string;
+      descAr: string;
+      descEn: string;
+      color: string;
+    }> = [];
+
+    if (walletSettings.enableVodafoneCash !== false) {
+      list.push({
+        id: 'vodafone_cash',
+        nameAr: 'فودافون كاش',
+        nameEn: 'Vodafone Cash',
+        descAr: 'تحويل لمحفظة فودافون كاش',
+        descEn: 'Direct wallet transfer',
+        color: 'red'
+      });
+    }
+
+    if (walletSettings.enableInstapay !== false) {
+      list.push({
+        id: 'instapay',
+        nameAr: 'انستا باي InstaPay',
+        nameEn: 'InstaPay',
+        descAr: 'تحويل لحظي بالمعرف أو الرقم',
+        descEn: 'Instant bank transfer',
+        color: 'purple'
+      });
+    }
+
+    if (walletSettings.enableCod !== false) {
+      list.push({
+        id: 'cod',
+        nameAr: 'الدفع عند الاستلام',
+        nameEn: 'Cash on Delivery',
+        descAr: 'الدفع لمندوب الشحن عند المعاينة',
+        descEn: 'Pay to courier upon inspection',
+        color: 'neutral'
+      });
+    }
+
+    if (walletSettings.enableOrangeCash === true) {
+      list.push({
+        id: 'orange_cash',
+        nameAr: 'أورنج كاش',
+        nameEn: 'Orange Cash',
+        descAr: 'تحويل لمحفظة أورنج كاش',
+        descEn: 'Orange wallet transfer',
+        color: 'orange'
+      });
+    }
+
+    if (walletSettings.enableEtisalatCash === true) {
+      list.push({
+        id: 'etisalat_cash',
+        nameAr: 'اتصالات كاش',
+        nameEn: 'Etisalat Cash',
+        descAr: 'تحويل لمحفظة اتصالات كاش',
+        descEn: 'Etisalat wallet transfer',
+        color: 'emerald'
+      });
+    }
+
+    // Fallback if all are somehow disabled
+    if (list.length === 0) {
+      list.push({
+        id: 'cod',
+        nameAr: 'الدفع عند الاستلام',
+        nameEn: 'Cash on Delivery',
+        descAr: 'الدفع لمندوب الشحن عند المعاينة',
+        descEn: 'Pay to courier upon inspection',
+        color: 'neutral'
+      });
+    }
+
+    return list;
+  }, [walletSettings]);
+
+  // Ensure current payment method is one of the enabled methods
+  useEffect(() => {
+    if (!availablePaymentMethods.some((m) => m.id === paymentMethod)) {
+      if (availablePaymentMethods[0]) {
+        setPaymentMethod(availablePaymentMethods[0].id);
+      }
+    }
+  }, [availablePaymentMethods, paymentMethod]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<CustomerOrder | null>(null);
@@ -388,62 +478,52 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               {/* Payment Methods Tabs */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
-                {/* Vodafone Cash */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('vodafone_cash')}
-                  className={`p-3 border text-left cursor-pointer transition flex flex-col justify-between ${
-                    paymentMethod === 'vodafone_cash'
-                      ? 'border-red-600 bg-red-50/50 ring-1 ring-red-600'
-                      : 'border-neutral-200 hover:border-neutral-400 bg-neutral-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-bold text-red-700">{isArabic ? 'فودافون كاش' : 'Vodafone Cash'}</span>
-                    <Smartphone className="w-4 h-4 text-red-600" />
-                  </div>
-                  <span className="text-[10px] text-neutral-600 leading-tight">
-                    {isArabic ? 'تحويل لمحفظة فودافون كاش' : 'Direct wallet transfer'}
-                  </span>
-                </button>
+                {availablePaymentMethods.map((method) => {
+                  const isSelected = paymentMethod === method.id;
+                  let borderClasses = 'border-neutral-200 hover:border-neutral-400 bg-neutral-50';
+                  let textClass = 'text-neutral-900';
+                  if (isSelected) {
+                    if (method.id === 'vodafone_cash') {
+                      borderClasses = 'border-red-600 bg-red-50/50 ring-1 ring-red-600';
+                      textClass = 'text-red-700';
+                    } else if (method.id === 'instapay') {
+                      borderClasses = 'border-purple-600 bg-purple-50/50 ring-1 ring-purple-600';
+                      textClass = 'text-purple-700';
+                    } else if (method.id === 'orange_cash') {
+                      borderClasses = 'border-orange-600 bg-orange-50/50 ring-1 ring-orange-600';
+                      textClass = 'text-orange-700';
+                    } else if (method.id === 'etisalat_cash') {
+                      borderClasses = 'border-emerald-600 bg-emerald-50/50 ring-1 ring-emerald-600';
+                      textClass = 'text-emerald-700';
+                    } else {
+                      borderClasses = 'border-black bg-neutral-100 ring-1 ring-black';
+                      textClass = 'text-neutral-900';
+                    }
+                  }
 
-                {/* InstaPay */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('instapay')}
-                  className={`p-3 border text-left cursor-pointer transition flex flex-col justify-between ${
-                    paymentMethod === 'instapay'
-                      ? 'border-purple-600 bg-purple-50/50 ring-1 ring-purple-600'
-                      : 'border-neutral-200 hover:border-neutral-400 bg-neutral-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-bold text-purple-700">{isArabic ? 'انستا باي InstaPay' : 'InstaPay'}</span>
-                    <CreditCard className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <span className="text-[10px] text-neutral-600 leading-tight">
-                    {isArabic ? 'تحويل لحظي بالمعرف أو الرقم' : 'Instant bank transfer'}
-                  </span>
-                </button>
-
-                {/* Cash on Delivery */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('cod')}
-                  className={`p-3 border text-left cursor-pointer transition flex flex-col justify-between ${
-                    paymentMethod === 'cod'
-                      ? 'border-black bg-neutral-100 ring-1 ring-black'
-                      : 'border-neutral-200 hover:border-neutral-400 bg-neutral-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-bold text-neutral-900">{isArabic ? 'الدفع عند الاستلام' : 'Cash on Delivery'}</span>
-                    <Truck className="w-4 h-4 text-neutral-900" />
-                  </div>
-                  <span className="text-[10px] text-neutral-600 leading-tight">
-                    {isArabic ? 'الدفع لمندوب الشحن عند المعاينة' : 'Pay to courier upon inspection'}
-                  </span>
-                </button>
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(method.id)}
+                      className={`p-3 border text-left rtl:text-right cursor-pointer transition flex flex-col justify-between ${borderClasses}`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className={`text-xs font-bold ${textClass}`}>
+                          {isArabic ? method.nameAr : method.nameEn}
+                        </span>
+                        {method.id === 'vodafone_cash' && <Smartphone className="w-4 h-4 text-red-600" />}
+                        {method.id === 'instapay' && <CreditCard className="w-4 h-4 text-purple-600" />}
+                        {method.id === 'cod' && <Truck className="w-4 h-4 text-neutral-900" />}
+                        {method.id === 'orange_cash' && <Smartphone className="w-4 h-4 text-orange-600" />}
+                        {method.id === 'etisalat_cash' && <Smartphone className="w-4 h-4 text-emerald-600" />}
+                      </div>
+                      <span className="text-[10px] text-neutral-600 leading-tight">
+                        {isArabic ? method.descAr : method.descEn}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Transfer Details Panel based on selection */}
@@ -584,6 +664,126 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         value={transactionRef}
                         onChange={(e) => setTransactionRef(e.target.value)}
                         className="w-full p-2 bg-white border border-purple-300 focus:outline-none focus:border-purple-600 font-medium"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {paymentMethod === 'orange_cash' && (
+                <div className="bg-orange-50 border border-orange-200 p-3.5 space-y-3 animate-in fade-in text-xs">
+                  <div>
+                    <h4 className="font-bold text-orange-900">
+                      {isArabic ? 'بيانات التحويل عبر أورنج كاش:' : 'Orange Cash Transfer Details:'}
+                    </h4>
+                    <p className="text-[11px] text-orange-700 mt-0.5">
+                      {isArabic
+                        ? `قم بتحويل المبلغ (${formatPrice(finalTotal)}) أو رسوم الشحن (${formatPrice(shippingCost)}) على رقم المحفظة:`
+                        : `Transfer total (${formatPrice(finalTotal)}) or shipping fee (${formatPrice(shippingCost)}) to Orange wallet:`}
+                    </p>
+                  </div>
+                  <div className="bg-white p-2.5 border border-orange-300 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono text-sm sm:text-base font-black text-black tracking-wider">
+                        {walletSettings.orangeCash || vodafoneNumber}
+                      </span>
+                      <span className="text-[10px] bg-orange-100 text-orange-800 font-bold px-1.5 py-0.5 rounded">
+                        {isArabic ? 'محفظة أورنج' : 'Orange Wallet'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(walletSettings.orangeCash || vodafoneNumber, 'orange')}
+                      className="px-2.5 py-1 bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-bold rounded flex items-center space-x-1 cursor-pointer transition"
+                    >
+                      {copiedAccount === 'orange' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedAccount === 'orange' ? (isArabic ? 'تم النسخ' : 'Copied') : (isArabic ? 'نسخ الرقم' : 'Copy')}</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-800 mb-1">
+                        {isArabic ? 'رقم الهاتف المحول منه (المرسل) *' : 'Sender Phone Number *'}
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="012XXXXXXXX"
+                        value={senderPhone}
+                        onChange={(e) => setSenderPhone(e.target.value)}
+                        className="w-full p-2 bg-white border border-orange-300 focus:outline-none focus:border-orange-600 font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-800 mb-1">
+                        {isArabic ? 'رقم العملية أو المرجع (اختياري)' : 'Transaction Ref Number (Optional)'}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. TXN-92810"
+                        value={transactionRef}
+                        onChange={(e) => setTransactionRef(e.target.value)}
+                        className="w-full p-2 bg-white border border-orange-300 focus:outline-none focus:border-orange-600 font-medium"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {paymentMethod === 'etisalat_cash' && (
+                <div className="bg-emerald-50 border border-emerald-200 p-3.5 space-y-3 animate-in fade-in text-xs">
+                  <div>
+                    <h4 className="font-bold text-emerald-900">
+                      {isArabic ? 'بيانات التحويل عبر اتصالات كاش:' : 'Etisalat Cash Transfer Details:'}
+                    </h4>
+                    <p className="text-[11px] text-emerald-700 mt-0.5">
+                      {isArabic
+                        ? `قم بتحويل المبلغ (${formatPrice(finalTotal)}) أو رسوم الشحن (${formatPrice(shippingCost)}) على رقم المحفظة:`
+                        : `Transfer total (${formatPrice(finalTotal)}) or shipping fee (${formatPrice(shippingCost)}) to Etisalat wallet:`}
+                    </p>
+                  </div>
+                  <div className="bg-white p-2.5 border border-emerald-300 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono text-sm sm:text-base font-black text-black tracking-wider">
+                        {walletSettings.etisalatCash || vodafoneNumber}
+                      </span>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                        {isArabic ? 'محفظة اتصالات' : 'Etisalat Wallet'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(walletSettings.etisalatCash || vodafoneNumber, 'etisalat')}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded flex items-center space-x-1 cursor-pointer transition"
+                    >
+                      {copiedAccount === 'etisalat' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedAccount === 'etisalat' ? (isArabic ? 'تم النسخ' : 'Copied') : (isArabic ? 'نسخ الرقم' : 'Copy')}</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-800 mb-1">
+                        {isArabic ? 'رقم الهاتف المحول منه (المرسل) *' : 'Sender Phone Number *'}
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="011XXXXXXXX"
+                        value={senderPhone}
+                        onChange={(e) => setSenderPhone(e.target.value)}
+                        className="w-full p-2 bg-white border border-emerald-300 focus:outline-none focus:border-emerald-600 font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-800 mb-1">
+                        {isArabic ? 'رقم العملية أو المرجع (اختياري)' : 'Transaction Ref Number (Optional)'}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. TXN-92810"
+                        value={transactionRef}
+                        onChange={(e) => setTransactionRef(e.target.value)}
+                        className="w-full p-2 bg-white border border-emerald-300 focus:outline-none focus:border-emerald-600 font-medium"
                       />
                     </div>
                   </div>
